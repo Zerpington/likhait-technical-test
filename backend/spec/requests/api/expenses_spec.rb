@@ -16,12 +16,51 @@ RSpec.describe "Api::Expenses", type: :request do
       expect(json.length).to eq(2)
     end
 
-    it "returns expenses in descending order by created_at" do
+    it "returns expenses in descending order by date, id as tiebreaker" do
       get "/api/expenses"
 
       json = JSON.parse(response.body)
       expect(json.first["id"]).to eq(expense2.id)
       expect(json.last["id"]).to eq(expense1.id)
+    end
+  end
+
+  describe "GET /api/expenses?year=&month=" do
+    let!(:january_expense) { Expense.create!(description: "New Year Dinner", amount: 40.00, category: food_category, date: Date.new(2026, 1, 15)) }
+    let!(:february_expense) { Expense.create!(description: "February Cab", amount: 20.00, category: transport_category, date: Date.new(2026, 2, 1)) }
+
+    it "returns only expenses whose date falls within the requested month" do
+      get "/api/expenses", params: { year: 2026, month: 1 }
+
+      expect(response).to have_http_status(:success)
+      json = JSON.parse(response.body)
+      expect(json.map { |e| e["id"] }).to contain_exactly(january_expense.id)
+    end
+
+    it "returns only expenses whose date falls within a different requested month" do
+      get "/api/expenses", params: { year: 2026, month: 2 }
+
+      json = JSON.parse(response.body)
+      expect(json.map { |e| e["id"] }).to contain_exactly(february_expense.id)
+    end
+
+    it "filters by the expense's date, not by when the record was created" do
+      # Simulates backdating: the expense is entered today but its date belongs to a past month.
+      backdated_expense = Expense.create!(
+        description: "Backdated rent",
+        amount: 500.00,
+        category: food_category,
+        date: Date.new(2026, 1, 20),
+        created_at: Time.current
+      )
+
+      get "/api/expenses", params: { year: 2026, month: 1 }
+      json = JSON.parse(response.body)
+      expect(json.map { |e| e["id"] }).to include(backdated_expense.id)
+
+      get "/api/expenses", params: { year: Time.current.year, month: Time.current.month }
+      json = JSON.parse(response.body)
+      expect(json.map { |e| e["id"] }).not_to include(backdated_expense.id)
     end
   end
 
@@ -46,7 +85,7 @@ RSpec.describe "Api::Expenses", type: :request do
         expect(response).to have_http_status(:created)
         json = JSON.parse(response.body)
         expect(json["description"]).to eq("Team Lunch")
-        expect(json["amount"]).to eq("150.5")
+        expect(json["amount"]).to eq(150.5)
       end
     end
 
