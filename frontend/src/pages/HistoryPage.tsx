@@ -153,12 +153,15 @@ const HistoryPage: React.FC = () => {
         <div style={{ display: "flex", gap: "12px" }}>
           <Button
             variant="primary"
+            onClick={() => setIsModalOpen(true)}
+          >
+            Add Expense
+          </Button>
+          <Button
+            variant="primary"
             onClick={() => setIsAddCategoryModalOpen(true)}
           >
             Add Category
-          </Button>
-          <Button variant="primary" onClick={() => setIsModalOpen(true)}>
-            Add Expense
           </Button>
         </div>
       </div>
